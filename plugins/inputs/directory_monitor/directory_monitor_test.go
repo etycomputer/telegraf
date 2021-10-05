@@ -134,3 +134,152 @@ func TestMultipleJSONFileImports(t *testing.T) {
 	// Verify that we read each JSON line once to a single metric.
 	require.Equal(t, len(acc.Metrics), 5)
 }
+
+func TestCSVSkipRows0(t *testing.T) {
+
+	acc := testutil.Accumulator{}
+	testCsvFile := "test.csv"
+
+	// Establish process directory and finished directory.
+	finishedDirectory, err := os.MkdirTemp("", "finished")
+	require.NoError(t, err)
+	processDirectory, err := os.MkdirTemp("", "test")
+	require.NoError(t, err)
+	defer os.RemoveAll(processDirectory)
+	defer os.RemoveAll(finishedDirectory)
+
+	// Init plugin.
+	r := DirectoryMonitor{
+		Directory:          processDirectory,
+		FinishedDirectory:  finishedDirectory,
+		MaxBufferedMetrics: 1000,
+		FileQueueSize:      100000,
+	}
+	err = r.Init()
+	require.NoError(t, err)
+
+	parserConfig := parsers.Config{
+		DataFormat:        "csv",
+		CSVHeaderRowCount: 1,
+		CSVSkipRows:       0,
+		CSVTagColumns:     []string{"line1"},
+	}
+	require.NoError(t, err)
+	r.SetParserFunc(func() (parsers.Parser, error) {
+		return parsers.NewParser(&parserConfig)
+	})
+	r.Log = testutil.Logger{}
+
+	testCSV := `line1,line2,line3
+hello,80,test_name2`
+
+	expectedFields := map[string]interface{}{
+		"line2": int64(80),
+		"line3": "test_name2",
+	}
+
+	// Write csv file to process into the 'process' directory.
+	f, err := os.Create(filepath.Join(processDirectory, testCsvFile))
+	require.NoError(t, err)
+	_, err = f.WriteString(testCSV)
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+
+	// Start plugin before adding file.
+	err = r.Start(&acc)
+	require.NoError(t, err)
+	err = r.Gather(&acc)
+	require.NoError(t, err)
+	acc.Wait(1)
+	r.Stop()
+
+	// Verify that we read both files once.
+	require.Equal(t, len(acc.Metrics), 1)
+
+	// File should have gone back to the test directory, as we configured.
+	_, err = os.Stat(filepath.Join(finishedDirectory, testCsvFile))
+	require.NoError(t, err)
+	for _, m := range acc.Metrics {
+		for key, value := range m.Tags {
+			require.Equal(t, "line1", key)
+			require.Equal(t, "hello", value)
+		}
+		require.Equal(t, expectedFields, m.Fields)
+	}
+}
+
+func TestCSVSkipRows1(t *testing.T) {
+
+	acc := testutil.Accumulator{}
+	testCsvFile := "test.csv"
+
+	// Establish process directory and finished directory.
+	finishedDirectory, err := os.MkdirTemp("", "finished")
+	require.NoError(t, err)
+	processDirectory, err := os.MkdirTemp("", "test")
+	require.NoError(t, err)
+	defer os.RemoveAll(processDirectory)
+	defer os.RemoveAll(finishedDirectory)
+
+	// Init plugin.
+	r := DirectoryMonitor{
+		Directory:          processDirectory,
+		FinishedDirectory:  finishedDirectory,
+		MaxBufferedMetrics: 1000,
+		FileQueueSize:      100000,
+	}
+	err = r.Init()
+	require.NoError(t, err)
+
+	parserConfig := parsers.Config{
+		DataFormat:        "csv",
+		CSVHeaderRowCount: 1,
+		CSVSkipRows:       1,
+		CSVTagColumns:     []string{"line1"},
+	}
+	require.NoError(t, err)
+	r.SetParserFunc(func() (parsers.Parser, error) {
+		return parsers.NewParser(&parserConfig)
+	})
+	r.Log = testutil.Logger{}
+
+	testCSV := `garbage nonsense
+line1,line2,line3
+hello,80,test_name2`
+
+	expectedFields := map[string]interface{}{
+		"line2": int64(80),
+		"line3": "test_name2",
+	}
+
+	// Write csv file to process into the 'process' directory.
+	f, err := os.Create(filepath.Join(processDirectory, testCsvFile))
+	require.NoError(t, err)
+	_, err = f.WriteString(testCSV)
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
+
+	// Start plugin before adding file.
+	err = r.Start(&acc)
+	require.NoError(t, err)
+	err = r.Gather(&acc)
+	require.NoError(t, err)
+	acc.Wait(1)
+	r.Stop()
+
+	// Verify that we read both files once.
+	require.Equal(t, len(acc.Metrics), 1)
+
+	// File should have gone back to the test directory, as we configured.
+	_, err = os.Stat(filepath.Join(finishedDirectory, testCsvFile))
+	require.NoError(t, err)
+	for _, m := range acc.Metrics {
+		for key, value := range m.Tags {
+			require.Equal(t, "line1", key)
+			require.Equal(t, "hello", value)
+		}
+		require.Equal(t, expectedFields, m.Fields)
+	}
+}
