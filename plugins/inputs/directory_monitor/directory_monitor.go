@@ -83,6 +83,10 @@ type DirectoryMonitor struct {
 	Log                        telegraf.Logger `toml:"-"`
 	FileQueueSize              int             `toml:"file_queue_size"`
 
+	// Related to CSV data format type
+	CSVHeaderRowCount int `toml:"csv_header_row_count"`
+	CSVSkipRows       int `toml:"csv_skip_rows"`
+
 	filesInUse          sync.Map
 	cancel              context.CancelFunc
 	context             context.Context
@@ -256,9 +260,24 @@ func (monitor *DirectoryMonitor) ingestFile(filePath string) error {
 func (monitor *DirectoryMonitor) parseFile(parser parsers.Parser, reader io.Reader) error {
 	// Read the file line-by-line and parse with the configured parse method.
 	firstLine := true
+	initialReadCount := monitor.CSVHeaderRowCount + monitor.CSVSkipRows
 	scanner := bufio.NewScanner(reader)
+	var ReadBuffer []byte
+	isCSVParseType := false
+	switch parser.(type) {
+	case *csv.Parser:
+		isCSVParseType = true
+		break
+	}
 	for scanner.Scan() {
-		metrics, err := monitor.parseLine(parser, scanner.Bytes(), firstLine)
+		if firstLine && isCSVParseType && initialReadCount > 0 {
+			ReadBuffer = append(ReadBuffer, scanner.Bytes()...)
+			initialReadCount--
+			continue
+		} else {
+			ReadBuffer = scanner.Bytes()
+		}
+		metrics, err := monitor.parseLine(parser, ReadBuffer, firstLine)
 		if err != nil {
 			return err
 		}
@@ -408,6 +427,8 @@ func init() {
 			MaxBufferedMetrics:         defaultMaxBufferedMetrics,
 			DirectoryDurationThreshold: defaultDirectoryDurationThreshold,
 			FileQueueSize:              defaultFileQueueSize,
+			CSVHeaderRowCount:          0,
+			CSVSkipRows:                0,
 		}
 	})
 }
