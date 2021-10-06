@@ -278,9 +278,14 @@ func (monitor *DirectoryMonitor) parseFile(parser parsers.Parser, reader io.Read
 	}
 	for scanner.Scan() {
 		if firstLine && isCSVParseType && initialReadCount > 0 {
+			if len(ReadBuffer) > 0 {
+				ReadBuffer = append(ReadBuffer, []byte("\n")...)
+			}
 			ReadBuffer = append(ReadBuffer, scanner.Bytes()...)
 			initialReadCount--
-			continue
+			if initialReadCount > 0 {
+				continue
+			}
 		} else {
 			ReadBuffer = scanner.Bytes()
 		}

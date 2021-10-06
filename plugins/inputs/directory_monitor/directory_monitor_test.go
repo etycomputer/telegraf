@@ -287,6 +287,8 @@ func TestCSVSkipRows1(t *testing.T) {
 		FinishedDirectory:  finishedDirectory,
 		MaxBufferedMetrics: 1000,
 		FileQueueSize:      100000,
+		CSVHeaderRowCount:  1,
+		CSVSkipRows:        1,
 	}
 	err = r.Init()
 	require.NoError(t, err)
