@@ -153,6 +153,9 @@ type Config struct {
 	CSVTrimSpace         bool     `toml:"csv_trim_space"`
 	CSVSkipValues        []string `toml:"csv_skip_values"`
 	CSVSkipErrors        bool     `toml:"csv_skip_errors"`
+	CSVMetadataRows       int      `toml:"csv_metadata_rows"`
+	CSVMetadataSeparators []string `toml:"cvs_metadata_separators"`
+	CSVMetadataTrimSet    string   `toml:"cvs_metadata_trim_set"`
 
 	// FormData configuration
 	FormUrlencodedTagKeys []string `toml:"form_urlencoded_tag_keys"`
@@ -252,6 +255,9 @@ func NewParser(config *Config) (Parser, error) {
 			DefaultTags:       config.DefaultTags,
 			SkipValues:        config.CSVSkipValues,
 			SkipErrors:        config.CSVSkipErrors,
+			MetadataRows:       config.CSVMetadataRows,
+			MetadataSeparators: config.CSVMetadataSeparators,
+			MetadataTrimSet:    config.CSVMetadataTrimSet,
 		}
 
 		return csv.NewParser(config)

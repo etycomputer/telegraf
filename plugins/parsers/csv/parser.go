@@ -1,10 +1,12 @@
 package csv
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,17 +35,82 @@ type Config struct {
 	TrimSpace         bool     `toml:"csv_trim_space"`
 	SkipValues        []string `toml:"csv_skip_values"`
 	SkipErrors        bool     `toml:"csv_skip_errors"`
+	MetadataRows       int      `toml:"csv_metadata_rows"`
+	MetadataSeparators []string `toml:"cvs_metadata_separators"`
+	MetadataTrimSet    string   `toml:"cvs_metadata_trim_set"`
+
+	MetadataSeparatorList MetadataPattern
 
 	gotColumnNames bool
 
-	TimeFunc    func() time.Time
-	DefaultTags map[string]string
+	TimeFunc     func() time.Time
+	DefaultTags  map[string]string
+	MetadataTags map[string]string
 }
 
 // Parser is a CSV parser, you should use NewParser to create a new instance.
 type Parser struct {
 	*Config
 	Log telegraf.Logger
+}
+
+type MetadataPattern []string
+
+func (record MetadataPattern) Len() int {
+	return len(record)
+}
+func (record MetadataPattern) Swap(i, j int) {
+	record[i], record[j] = record[j], record[i]
+}
+func (record MetadataPattern) Less(i, j int) bool {
+	// Metadata with longer lengths should be ordered before shorter metadata
+	return len(record[i]) > len(record[j])
+}
+
+func getUniqueMetadataPatterns(patternMap []string) MetadataPattern {
+	result := MetadataPattern{}
+	patternList := map[string]bool{}
+	for _, p := range patternMap {
+		if patternList[p] {
+			// Ignore further, duplicated entries
+			continue
+		}
+		patternList[p] = true
+		result = append(result, p)
+	}
+	return result
+}
+
+func (c *Config) initializeMetadataSeparators() error {
+	// initialize metadata
+	c.MetadataTags = map[string]string{}
+	c.MetadataSeparatorList = []string{}
+
+	if c.MetadataRows > 0 {
+		if len(c.MetadataSeparators) == 0 {
+			return fmt.Errorf("when csv_metadata_rows is defined, " +
+				"cvs_metadata_separators must have at least one valid separator string")
+		}
+		c.MetadataSeparatorList = getUniqueMetadataPatterns(c.MetadataSeparators)
+		sort.Stable(c.MetadataSeparatorList)
+	}
+	return nil
+}
+
+func (p *Parser) ParseMetadataRow(haystack string) map[string]string {
+	haystack = strings.TrimRight(haystack, "\r\n")
+	for _, needle := range p.MetadataSeparatorList {
+		metadata := strings.SplitN(haystack, needle, 2)
+		if len(metadata) < 2 {
+			continue
+		}
+		key := strings.Trim(metadata[0], p.MetadataTrimSet)
+		if len(key) > 0 {
+			value := strings.Trim(metadata[1], p.MetadataTrimSet)
+			return map[string]string{key: value}
+		}
+	}
+	return nil
 }
 
 func NewParser(c *Config) (*Parser, error) {
@@ -67,6 +134,11 @@ func NewParser(c *Config) (*Parser, error) {
 
 	if len(c.ColumnNames) > 0 && len(c.ColumnTypes) > 0 && len(c.ColumnNames) != len(c.ColumnTypes) {
 		return nil, fmt.Errorf("csv_column_names field count doesn't match with csv_column_types")
+	}
+
+	err := c.initializeMetadataSeparators()
+	if err != nil {
+		return nil, err
 	}
 
 	c.gotColumnNames = len(c.ColumnNames) > 0
@@ -104,6 +176,16 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 // ParseLine does not use any information in header and assumes DataColumns is set
 // it will also not skip any rows
 func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
+	if len(line) == 0 {
+		if p.SkipRows > 0 {
+			p.SkipRows--
+			return nil, io.EOF
+		}
+		if p.MetadataRows > 0 {
+			p.MetadataRows--
+			return nil, io.EOF
+		}
+	}
 	r := bytes.NewReader([]byte(line))
 	metrics, err := parseCSV(p, r)
 	if err != nil {
@@ -119,15 +201,28 @@ func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 }
 
 func parseCSV(p *Parser, r io.Reader) ([]telegraf.Metric, error) {
-	csvReader := p.compile(r)
+	lineReader := bufio.NewReader(r)
 	// skip first rows
 	for p.SkipRows > 0 {
-		_, err := csvReader.Read()
-		if err != nil {
+		line, err := lineReader.ReadString('\n')
+		if err != nil && len(line) == 0 {
 			return nil, err
 		}
 		p.SkipRows--
 	}
+	// Parse metadata
+	for p.MetadataRows > 0 {
+		line, err := lineReader.ReadString('\n')
+		if err != nil && len(line) == 0 {
+			return nil, err
+		}
+		p.MetadataRows--
+		m := p.ParseMetadataRow(line)
+		for k, v := range m {
+			p.MetadataTags[k] = v
+		}
+	}
+	csvReader := p.compile(lineReader)
 	// if there is a header, and we did not get DataColumns
 	// set DataColumns to names extracted from the header
 	// we always reread the header to avoid side effects
@@ -261,6 +356,11 @@ outer:
 				recordFields[fieldName] = value
 			}
 		}
+	}
+
+	// add metadata fields
+	for k, v := range p.MetadataTags {
+		tags[k] = v
 	}
 
 	// add default tags
