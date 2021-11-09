@@ -812,3 +812,208 @@ func TestSkipSpecifiedStringValue(t *testing.T) {
 	}
 	testutil.RequireMetricsEqual(t, expected, metrics, testutil.IgnoreTime())
 }
+
+func TestParseMetadataRegex(t *testing.T) {
+	p, err := NewParser(
+		&Config{
+			ColumnNames:   []string{"a", "b"},
+			MetadataRows:  0,
+			MetadataRegex: []string{},
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	p, err = NewParser(
+		&Config{
+			ColumnNames:   []string{"a", "b"},
+			MetadataRows:  1,
+			MetadataRegex: []string{},
+		},
+	)
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "when csv_metadata_rows is defined, "+
+		"csv_metadata_regex must have at least one valid regex pattern string")
+	require.Nil(t, p)
+	p, err = NewParser(
+		&Config{
+			ColumnNames:   []string{"a", "b"},
+			MetadataRows:  1,
+			MetadataRegex: []string{"(?P<key>\\S+=?P<value>\\S+"},
+		},
+	)
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "the csv_metadata_regex[0] regex pattern is invalid")
+	require.Nil(t, p)
+	p, err = NewParser(
+		&Config{
+			ColumnNames:   []string{"a", "b"},
+			MetadataRows:  1,
+			MetadataRegex: []string{"(?P<key>\\w+)=(?P<value>\\d+)", "(\\w+)=(\\d+)"},
+		},
+	)
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "the csv_metadata_regex[1] regex pattern "+
+		"must contain both a `key` and `value` subgroup label")
+	require.Nil(t, p)
+	p, err = NewParser(
+		&Config{
+			ColumnNames:  []string{"a", "b"},
+			MetadataRows: 1,
+			MetadataRegex: []string{
+				"(?P<key>\\w+)=(?P<value>\\d+)",
+				"[#]?\\s+(?P<value>\\d+)\\s+:=\\s+(?P<key>\\w+)",
+				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, p.MetadataRegexPatternList, 3)
+	require.Equal(t, p.MetadataRegexPatternList[0].KeyIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[0].ValueIndex, 2)
+	require.Equal(t, p.MetadataRegexPatternList[1].KeyIndex, 2)
+	require.Equal(t, p.MetadataRegexPatternList[1].ValueIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[2].KeyIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[2].ValueIndex, 2)
+}
+
+func TestParseMetadataRow(t *testing.T) {
+	p, err := NewParser(
+		&Config{
+			ColumnNames:  []string{"a", "b"},
+			MetadataRows: 5,
+			MetadataRegex: []string{
+				"(?P<key>\\w+)=(?P<value>\\d+)",
+				"^[#]?\\s+(?P<value>\\w+)\\s+:=\\s+(?P<key>\\w+)",
+				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, p.MetadataRegexPatternList, 3)
+	require.Equal(t, p.MetadataRegexPatternList[0].KeyIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[0].ValueIndex, 2)
+	require.Equal(t, p.MetadataRegexPatternList[1].KeyIndex, 2)
+	require.Equal(t, p.MetadataRegexPatternList[1].ValueIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[2].KeyIndex, 1)
+	require.Equal(t, p.MetadataRegexPatternList[2].ValueIndex, 2)
+	require.Empty(t, p.DefaultFields)
+	m := p.ParseMetadataRow("# this is a not matching string")
+	require.Nil(t, m)
+	m = p.ParseMetadataRow("#\tvalue1 :=  key1\r\n")
+	require.Equal(t, m, &Metadata{"key1", "value1"})
+	m = p.ParseMetadataRow("key2=1234\r\n")
+	require.Equal(t, m, &Metadata{"key2", "1234"})
+	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18+10:00\r\n")
+	require.Equal(t, m, &Metadata{"file created", "2021-10-08T12:34:18+10:00"})
+	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18\r\n")
+	require.Equal(t, m, &Metadata{"file created", "2021-10-08T12:34:18"})
+}
+
+func TestParseCSVFileWithMetadata(t *testing.T) {
+	p, err := NewParser(
+		&Config{
+			HeaderRowCount: 1,
+			SkipRows:       1,
+			MetadataRows:   4,
+			Comment:        "#",
+			TagColumns:     []string{"type", "version"},
+			MetadataRegex: []string{
+				"^[#]?\\s+(?P<key>\\w+)=\\s+(?P<value>(\\d+(\\.\\d+)?))",
+				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
+			},
+		},
+	)
+	require.NoError(t, err)
+	testCSV := `garbage nonsense that needs be skipped
+
+# version= 1.0
+    invalid meta data that can be ignored.
+file created: 2021-10-08T12:34:18+10:00
+timestamp,type,name,status
+2020-11-23T08:19:27+10:00,Reader,R002,1
+#2020-11-04T13:23:04+10:00,Reader,R031,0
+2020-11-04T13:29:47+10:00,Coordinator,C001,0`
+	expectedFields := []map[string]interface{}{
+		{
+			"file created": "2021-10-08T12:34:18+10:00",
+			"name":         "R002",
+			"status":       int64(1),
+			"timestamp":    "2020-11-23T08:19:27+10:00",
+		},
+		{
+			"file created": "2021-10-08T12:34:18+10:00",
+			"name":         "C001",
+			"status":       int64(0),
+			"timestamp":    "2020-11-04T13:29:47+10:00",
+		},
+	}
+	expectedTags := []map[string]string{
+		{
+			"test":    "tag",
+			"type":    "Reader",
+			"version": "1.0",
+		},
+		{
+			"test":    "tag",
+			"type":    "Coordinator",
+			"version": "1.0",
+		},
+	}
+	// Set default Tags
+	p.SetDefaultTags(map[string]string{"test": "tag"})
+	metrics, err := p.Parse([]byte(testCSV))
+	require.NoError(t, err)
+	for i, m := range metrics {
+		require.Equal(t, expectedFields[i], m.Fields())
+		require.Equal(t, expectedTags[i], m.Tags())
+	}
+
+	p, err = NewParser(
+		&Config{
+			HeaderRowCount: 1,
+			SkipRows:       1,
+			MetadataRows:   4,
+			Comment:        "#",
+			TagColumns:     []string{"type", "version"},
+			MetadataRegex: []string{
+				"^[#]?\\s+(?P<key>\\w+)=\\s+(?P<value>(\\d+(\\.\\d+)?))",
+				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
+			},
+		},
+	)
+	require.NoError(t, err)
+	testCSVRows := []string{
+		"garbage nonsense that needs be skipped",
+		"",
+		"# version= 1.0\r\n",
+		"    invalid meta data that can be ignored.\r\n",
+		"file created: 2021-10-08T12:34:18+10:00",
+		"timestamp,type,name,status\n",
+		"2020-11-23T08:19:27+10:00,Reader,R002,1\r\n",
+		"#2020-11-04T13:23:04+10:00,Reader,R031,0\n",
+		"2020-11-04T13:29:47+10:00,Coordinator,C001,0",
+	}
+
+	// Set default Tags
+	p.SetDefaultTags(map[string]string{"test": "tag"})
+	for rowIndex := 0; rowIndex < 5; rowIndex++ {
+		m, err := p.ParseLine(testCSVRows[rowIndex])
+		require.Error(t, io.EOF, err)
+		require.Error(t, err)
+		require.Nil(t, m)
+	}
+	m, err := p.ParseLine(testCSVRows[5])
+	require.Nil(t, err)
+	require.Nil(t, m)
+	m, err = p.ParseLine(testCSVRows[6])
+	require.NoError(t, err)
+	require.Equal(t, expectedFields[0], m.Fields())
+	require.Equal(t, expectedTags[0], m.Tags())
+	m, err = p.ParseLine(testCSVRows[7])
+	require.NoError(t, err)
+	require.Nil(t, m)
+	m, err = p.ParseLine(testCSVRows[8])
+	require.NoError(t, err)
+	require.Equal(t, expectedFields[1], m.Fields())
+	require.Equal(t, expectedTags[1], m.Tags())
+}

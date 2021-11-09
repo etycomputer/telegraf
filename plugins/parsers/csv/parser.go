@@ -1,10 +1,12 @@
 package csv
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,17 @@ import (
 )
 
 type TimeFunc func() time.Time
+
+type Metadata struct {
+	key   string
+	value string
+}
+
+type MetadataRegexPattern struct {
+	Re         *regexp.Regexp
+	KeyIndex   int
+	ValueIndex int
+}
 
 type Config struct {
 	ColumnNames       []string `toml:"csv_column_names"`
@@ -32,16 +45,72 @@ type Config struct {
 	Timezone          string   `toml:"csv_timezone"`
 	TrimSpace         bool     `toml:"csv_trim_space"`
 	SkipValues        []string `toml:"csv_skip_values"`
+	MetadataRows      int      `toml:"csv_metadata_rows"`
+	MetadataRegex     []string `toml:"csv_metadata_regex"`
+
+	MetadataRegexPatternList []MetadataRegexPattern
 
 	gotColumnNames bool
 
-	TimeFunc    func() time.Time
-	DefaultTags map[string]string
+	TimeFunc      func() time.Time
+	DefaultTags   map[string]string
+	DefaultFields map[string]string
 }
 
 // Parser is a CSV parser, you should use NewParser to create a new instance.
 type Parser struct {
 	*Config
+}
+
+func (c *Config) ParseMetadataRegex() error {
+	// initialize metadata
+	c.DefaultFields = map[string]string{}
+	c.MetadataRegexPatternList = []MetadataRegexPattern{}
+
+	if c.MetadataRows > 0 {
+		if len(c.MetadataRegex) == 0 {
+			return fmt.Errorf("when csv_metadata_rows is defined, " +
+				"csv_metadata_regex must have at least one valid regex pattern string")
+		}
+		for i, p := range c.MetadataRegex {
+			re, err := regexp.Compile(p)
+			errorMessage := fmt.Sprintf("the csv_metadata_regex[%d] regex pattern", i)
+			if err != nil {
+				return fmt.Errorf("%s is invalid", errorMessage)
+			}
+			x := MetadataRegexPattern{
+				Re:         re,
+				KeyIndex:   0,
+				ValueIndex: 0,
+			}
+			for j, k := range x.Re.SubexpNames() {
+				if k == "key" {
+					x.KeyIndex = j
+				} else if k == "value" {
+					x.ValueIndex = j
+				}
+			}
+			if x.KeyIndex == 0 || x.ValueIndex == 0 {
+				return fmt.Errorf("%s must contain both a `key` and `value` subgroup label", errorMessage)
+			}
+			c.MetadataRegexPatternList = append(c.MetadataRegexPatternList, x)
+		}
+	}
+	return nil
+}
+
+func (p *Parser) ParseMetadataRow(str string) *Metadata {
+	for _, re := range p.MetadataRegexPatternList {
+		result := re.Re.FindStringSubmatch(str)
+		if result != nil {
+			// Found a match
+			return &Metadata{
+				result[re.KeyIndex],
+				result[re.ValueIndex],
+			}
+		}
+	}
+	return nil
 }
 
 func NewParser(c *Config) (*Parser, error) {
@@ -65,6 +134,11 @@ func NewParser(c *Config) (*Parser, error) {
 
 	if len(c.ColumnNames) > 0 && len(c.ColumnTypes) > 0 && len(c.ColumnNames) != len(c.ColumnTypes) {
 		return nil, fmt.Errorf("csv_column_names field count doesn't match with csv_column_types")
+	}
+
+	err := c.ParseMetadataRegex()
+	if err != nil {
+		return nil, err
 	}
 
 	c.gotColumnNames = len(c.ColumnNames) > 0
@@ -102,6 +176,16 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 // ParseLine does not use any information in header and assumes DataColumns is set
 // it will also not skip any rows
 func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
+	if len(line) == 0 {
+		if p.SkipRows > 0 {
+			p.SkipRows--
+			return nil, io.EOF
+		}
+		if p.MetadataRows > 0 {
+			p.MetadataRows--
+			return nil, io.EOF
+		}
+	}
 	r := bytes.NewReader([]byte(line))
 	metrics, err := parseCSV(p, r)
 	if err != nil {
@@ -117,15 +201,35 @@ func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 }
 
 func parseCSV(p *Parser, r io.Reader) ([]telegraf.Metric, error) {
-	csvReader := p.compile(r)
+	lineReader := bufio.NewReader(r)
 	// skip first rows
 	for p.SkipRows > 0 {
-		_, err := csvReader.Read()
-		if err != nil {
+		line, err := lineReader.ReadString('\n')
+		if err != nil && len(line) == 0 {
 			return nil, err
 		}
 		p.SkipRows--
 	}
+	// Parse metadata
+outer:
+	for p.MetadataRows > 0 {
+		line, err := lineReader.ReadString('\n')
+		if err != nil && len(line) == 0 {
+			return nil, err
+		}
+		p.MetadataRows--
+		m := p.ParseMetadataRow(line)
+		if m != nil {
+			for _, tagName := range p.TagColumns {
+				if tagName == m.key {
+					p.DefaultTags[m.key] = m.value
+					continue outer
+				}
+			}
+			p.DefaultFields[m.key] = m.value
+		}
+	}
+	csvReader := p.compile(lineReader)
 	// if there is a header, and we did not get DataColumns
 	// set DataColumns to names extracted from the header
 	// we always reread the header to avoid side effects
@@ -260,6 +364,11 @@ outer:
 	// add default tags
 	for k, v := range p.DefaultTags {
 		tags[k] = v
+	}
+
+	// add default fields
+	for k, v := range p.DefaultFields {
+		recordFields[k] = v
 	}
 
 	// will default to plugin name

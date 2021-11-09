@@ -33,8 +33,28 @@ values.
   ## If this is not specified, type conversion will be done on the types above.
   csv_column_types = []
 
-  ## Indicates the number of rows to skip before looking for header information.
+  ## Indicates the number of rows to skip before looking for metadata and header information.
   csv_skip_rows = 0
+  
+  
+  ## Indicates the number of rows to parse as metadata before looking for header information. 
+  ## By default, the parser assumes there are no metadata rows to parse. 
+  ## If set, the parser would use the regex provided in the csv_metadata_regex  to look for metadata.
+  # csv_metadata_rows = 0
+  ## A list of regex patterns with two subgroups named key and value. If csv_metadata_rows is set,
+  ## csv_metadata_regex must contain at least one regex patterns. Metadata key and value must be
+  ## on the same row.
+  ## For example:
+  ## Using "(?P<key>\\w+)[=](?P<value>\\w+)" 
+  ## to parse "key1=value1" 
+  ## would return key: "key1" and value: "value1"
+  ## Using "[#]?\\s+(?P<value>\\w+)\s+(?P<key>\\w+)" 
+  ## to parse "#\\tvalue2  key2" 
+  ## would return key: "key2" and value: "value2"
+  ## Using "^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\d{2}:\\d{2})?))" 
+  ## to parse "file created: 2021-10-08T12:34:18+10:00" 
+  ## would return key: "file created" and value: "2021-10-08T12:34:18+10:00"
+  # csv_metadata_regex = ["^(?P<key>\\w+)[=](?P<value>\\w+)"]
 
   ## Indicates the number of columns to skip before looking for data to parse.
   ## These columns will be skipped in the header as well.
@@ -81,7 +101,7 @@ values.
 
 ### csv_timestamp_column, csv_timestamp_format
 
-By default the current time will be used for all created metrics, to set the
+By default, the current time will be used for all created metrics, to set the
 time using the JSON document you can use the `csv_timestamp_column` and
 `csv_timestamp_format` options together to set the time to a value in the parsed
 document.
