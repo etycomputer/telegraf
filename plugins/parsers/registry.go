@@ -152,6 +152,8 @@ type Config struct {
 	CSVTimezone          string   `toml:"csv_timezone"`
 	CSVTrimSpace         bool     `toml:"csv_trim_space"`
 	CSVSkipValues        []string `toml:"csv_skip_values"`
+	CSVMetadataRows      int      `toml:"csv_metadata_rows"`
+	CSVMetadataRegex     []string `toml:"csv_metadata_regex"`
 
 	// FormData configuration
 	FormUrlencodedTagKeys []string `toml:"form_urlencoded_tag_keys"`
@@ -250,6 +252,8 @@ func NewParser(config *Config) (Parser, error) {
 			Timezone:          config.CSVTimezone,
 			DefaultTags:       config.DefaultTags,
 			SkipValues:        config.CSVSkipValues,
+			MetadataRows:      config.CSVMetadataRows,
+			MetadataRegex:     config.CSVMetadataRegex,
 		}
 
 		return csv.NewParser(config)

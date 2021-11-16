@@ -48,10 +48,10 @@ values.
   ## Using "(?P<key>\\w+)[=](?P<value>\\w+)" 
   ## to parse "key1=value1" 
   ## would return key: "key1" and value: "value1"
-  ## Using "[#]?\\s+(?P<value>\\w+)\s+(?P<key>\\w+)" 
+  ## Using "[#]?\\s+(?P<value>\\w+)\\s+(?P<key>\\w+)" 
   ## to parse "#\\tvalue2  key2" 
   ## would return key: "key2" and value: "value2"
-  ## Using "^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\d{2}:\\d{2})?))" 
+  ## Using "^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))" 
   ## to parse "file created: 2021-10-08T12:34:18+10:00" 
   ## would return key: "file created" and value: "2021-10-08T12:34:18+10:00"
   # csv_metadata_regex = ["^(?P<key>\\w+)[=](?P<value>\\w+)"]

@@ -222,9 +222,15 @@ outer:
 		if m != nil {
 			for _, tagName := range p.TagColumns {
 				if tagName == m.key {
+					if p.DefaultTags == nil {
+						p.DefaultTags = make(map[string]string)
+					}
 					p.DefaultTags[m.key] = m.value
 					continue outer
 				}
+			}
+			if p.DefaultFields == nil {
+				p.DefaultFields = make(map[string]string)
 			}
 			p.DefaultFields[m.key] = m.value
 		}
