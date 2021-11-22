@@ -813,114 +813,104 @@ func TestSkipSpecifiedStringValue(t *testing.T) {
 	testutil.RequireMetricsEqual(t, expected, metrics, testutil.IgnoreTime())
 }
 
-func TestParseMetadataRegex(t *testing.T) {
+func TestParseMetadataSeparators(t *testing.T) {
 	p, err := NewParser(
 		&Config{
-			ColumnNames:   []string{"a", "b"},
-			MetadataRows:  0,
-			MetadataRegex: []string{},
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       0,
+			MetadataSeparators: []string{},
 		},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, p)
 	p, err = NewParser(
 		&Config{
-			ColumnNames:   []string{"a", "b"},
-			MetadataRows:  1,
-			MetadataRegex: []string{},
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       1,
+			MetadataSeparators: []string{},
 		},
 	)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "when csv_metadata_rows is defined, "+
-		"csv_metadata_regex must have at least one valid regex pattern string")
+		"cvs_metadata_separators must have at least one valid separator string")
 	require.Nil(t, p)
 	p, err = NewParser(
 		&Config{
-			ColumnNames:   []string{"a", "b"},
-			MetadataRows:  1,
-			MetadataRegex: []string{"(?P<key>\\S+=?P<value>\\S+"},
-		},
-	)
-	require.Error(t, err)
-	require.Equal(t, err.Error(), "the csv_metadata_regex[0] regex pattern is invalid")
-	require.Nil(t, p)
-	p, err = NewParser(
-		&Config{
-			ColumnNames:   []string{"a", "b"},
-			MetadataRows:  1,
-			MetadataRegex: []string{"(?P<key>\\w+)=(?P<value>\\d+)", "(\\w+)=(\\d+)"},
-		},
-	)
-	require.Error(t, err)
-	require.Equal(t, err.Error(), "the csv_metadata_regex[1] regex pattern "+
-		"must contain both a `key` and `value` subgroup label")
-	require.Nil(t, p)
-	p, err = NewParser(
-		&Config{
-			ColumnNames:  []string{"a", "b"},
-			MetadataRows: 1,
-			MetadataRegex: []string{
-				"(?P<key>\\w+)=(?P<value>\\d+)",
-				"[#]?\\s+(?P<value>\\d+)\\s+:=\\s+(?P<key>\\w+)",
-				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
-			},
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       1,
+			MetadataSeparators: []string{",", ":", "=", ",", ":", "=", ":="},
 		},
 	)
 	require.NoError(t, err)
-	require.Len(t, p.MetadataRegexPatternList, 3)
-	require.Equal(t, p.MetadataRegexPatternList[0].KeyIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[0].ValueIndex, 2)
-	require.Equal(t, p.MetadataRegexPatternList[1].KeyIndex, 2)
-	require.Equal(t, p.MetadataRegexPatternList[1].ValueIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[2].KeyIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[2].ValueIndex, 2)
+	require.Len(t, p.MetadataSeparatorList, 4)
+	require.Len(t, p.MetadataTrimSet, 0)
+	require.Equal(t, p.MetadataSeparatorList, MetadataPattern{":=", ",", ":", "="})
+	p, err = NewParser(
+		&Config{
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       1,
+			MetadataSeparators: []string{",", ":", "=", ":="},
+			MetadataTrimSet:    " #'",
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, p.MetadataSeparatorList, 4)
+	require.Len(t, p.MetadataTrimSet, 3)
+	require.Equal(t, p.MetadataSeparatorList, MetadataPattern{":=", ",", ":", "="})
 }
 
 func TestParseMetadataRow(t *testing.T) {
 	p, err := NewParser(
 		&Config{
-			ColumnNames:  []string{"a", "b"},
-			MetadataRows: 5,
-			MetadataRegex: []string{
-				"(?P<key>\\w+)=(?P<value>\\d+)",
-				"^[#]?\\s+(?P<value>\\w+)\\s+:=\\s+(?P<key>\\w+)",
-				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
-			},
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       5,
+			MetadataSeparators: []string{":=", ",", ":", "="},
 		},
 	)
 	require.NoError(t, err)
-	require.Len(t, p.MetadataRegexPatternList, 3)
-	require.Equal(t, p.MetadataRegexPatternList[0].KeyIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[0].ValueIndex, 2)
-	require.Equal(t, p.MetadataRegexPatternList[1].KeyIndex, 2)
-	require.Equal(t, p.MetadataRegexPatternList[1].ValueIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[2].KeyIndex, 1)
-	require.Equal(t, p.MetadataRegexPatternList[2].ValueIndex, 2)
 	require.Empty(t, p.DefaultFields)
 	m := p.ParseMetadataRow("# this is a not matching string")
 	require.Nil(t, m)
-	m = p.ParseMetadataRow("#\tvalue1 :=  key1\r\n")
-	require.Equal(t, m, &Metadata{"key1", "value1"})
-	m = p.ParseMetadataRow("key2=1234\r\n")
+	m = p.ParseMetadataRow("# key1 : value1 \r\n")
+	require.Equal(t, m, &Metadata{"# key1 ", " value1 "})
+	m = p.ParseMetadataRow("key2=1234\n")
 	require.Equal(t, m, &Metadata{"key2", "1234"})
-	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18+10:00\r\n")
+	m = p.ParseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
+	require.Equal(t, m, &Metadata{" file created ", " 2021-10-08T12:34:18+10:00 "})
+	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18\t\r\r\n")
+	require.Equal(t, m, &Metadata{"file created", " 2021-10-08T12:34:18\t"})
+	p, err = NewParser(
+		&Config{
+			ColumnNames:        []string{"a", "b"},
+			MetadataRows:       5,
+			MetadataSeparators: []string{":=", ",", ":", "="},
+			MetadataTrimSet:    " #'",
+		},
+	)
+	require.NoError(t, err)
+	require.Empty(t, p.DefaultFields)
+	m = p.ParseMetadataRow("# this is a not matching string")
+	require.Nil(t, m)
+	m = p.ParseMetadataRow("# key1 : value1 \r\n")
+	require.Equal(t, m, &Metadata{"key1", "value1"})
+	m = p.ParseMetadataRow("key2=1234\n")
+	require.Equal(t, m, &Metadata{"key2", "1234"})
+	m = p.ParseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
 	require.Equal(t, m, &Metadata{"file created", "2021-10-08T12:34:18+10:00"})
-	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18\r\n")
+	m = p.ParseMetadataRow("file created: '2021-10-08T12:34:18'\r\n")
 	require.Equal(t, m, &Metadata{"file created", "2021-10-08T12:34:18"})
 }
 
 func TestParseCSVFileWithMetadata(t *testing.T) {
 	p, err := NewParser(
 		&Config{
-			HeaderRowCount: 1,
-			SkipRows:       1,
-			MetadataRows:   4,
-			Comment:        "#",
-			TagColumns:     []string{"type", "version"},
-			MetadataRegex: []string{
-				"^[#]?\\s+(?P<key>\\w+)=\\s+(?P<value>(\\d+(\\.\\d+)?))",
-				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
-			},
+			HeaderRowCount:     1,
+			SkipRows:           1,
+			MetadataRows:       4,
+			Comment:            "#",
+			TagColumns:         []string{"type", "version"},
+			MetadataSeparators: []string{":", "="},
+			MetadataTrimSet:    " #",
 		},
 	)
 	require.NoError(t, err)
@@ -970,15 +960,13 @@ timestamp,type,name,status
 
 	p, err = NewParser(
 		&Config{
-			HeaderRowCount: 1,
-			SkipRows:       1,
-			MetadataRows:   4,
-			Comment:        "#",
-			TagColumns:     []string{"type", "version"},
-			MetadataRegex: []string{
-				"^[#]?\\s+(?P<key>\\w+)=\\s+(?P<value>(\\d+(\\.\\d+)?))",
-				"^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))",
-			},
+			HeaderRowCount:     1,
+			SkipRows:           1,
+			MetadataRows:       4,
+			Comment:            "#",
+			TagColumns:         []string{"type", "version"},
+			MetadataSeparators: []string{":", "="},
+			MetadataTrimSet:    " #",
 		},
 	)
 	require.NoError(t, err)

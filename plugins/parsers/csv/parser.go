@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,25 +31,26 @@ type MetadataRegexPattern struct {
 }
 
 type Config struct {
-	ColumnNames       []string `toml:"csv_column_names"`
-	ColumnTypes       []string `toml:"csv_column_types"`
-	Comment           string   `toml:"csv_comment"`
-	Delimiter         string   `toml:"csv_delimiter"`
-	HeaderRowCount    int      `toml:"csv_header_row_count"`
-	MeasurementColumn string   `toml:"csv_measurement_column"`
-	MetricName        string   `toml:"metric_name"`
-	SkipColumns       int      `toml:"csv_skip_columns"`
-	SkipRows          int      `toml:"csv_skip_rows"`
-	TagColumns        []string `toml:"csv_tag_columns"`
-	TimestampColumn   string   `toml:"csv_timestamp_column"`
-	TimestampFormat   string   `toml:"csv_timestamp_format"`
-	Timezone          string   `toml:"csv_timezone"`
-	TrimSpace         bool     `toml:"csv_trim_space"`
-	SkipValues        []string `toml:"csv_skip_values"`
-	MetadataRows      int      `toml:"csv_metadata_rows"`
-	MetadataRegex     []string `toml:"csv_metadata_regex"`
+	ColumnNames        []string `toml:"csv_column_names"`
+	ColumnTypes        []string `toml:"csv_column_types"`
+	Comment            string   `toml:"csv_comment"`
+	Delimiter          string   `toml:"csv_delimiter"`
+	HeaderRowCount     int      `toml:"csv_header_row_count"`
+	MeasurementColumn  string   `toml:"csv_measurement_column"`
+	MetricName         string   `toml:"metric_name"`
+	SkipColumns        int      `toml:"csv_skip_columns"`
+	SkipRows           int      `toml:"csv_skip_rows"`
+	TagColumns         []string `toml:"csv_tag_columns"`
+	TimestampColumn    string   `toml:"csv_timestamp_column"`
+	TimestampFormat    string   `toml:"csv_timestamp_format"`
+	Timezone           string   `toml:"csv_timezone"`
+	TrimSpace          bool     `toml:"csv_trim_space"`
+	SkipValues         []string `toml:"csv_skip_values"`
+	MetadataRows       int      `toml:"csv_metadata_rows"`
+	MetadataSeparators []string `toml:"cvs_metadata_separators"`
+	MetadataTrimSet    string   `toml:"cvs_metadata_trim_set"`
 
-	MetadataRegexPatternList []MetadataRegexPattern
+	MetadataSeparatorList MetadataPattern
 
 	gotColumnNames bool
 
@@ -62,52 +64,61 @@ type Parser struct {
 	*Config
 }
 
+type MetadataPattern []string
+
+func (record MetadataPattern) Len() int {
+	return len(record)
+}
+func (record MetadataPattern) Swap(i, j int) {
+	record[i], record[j] = record[j], record[i]
+}
+func (record MetadataPattern) Less(i, j int) bool {
+	if len(record[i]) == len(record[j]) {
+		return record[i] < record[j]
+	}
+	return len(record[i]) > len(record[j])
+}
+
+func getUniqueMetadataPatterns(patternMap []string) MetadataPattern {
+	result := MetadataPattern{}
+	patternList := map[string]bool{}
+	for _, p := range patternMap {
+		patternList[p] = true
+	}
+	for k := range patternList {
+		result = append(result, k)
+	}
+	return result
+}
+
 func (c *Config) ParseMetadataRegex() error {
 	// initialize metadata
 	c.DefaultFields = map[string]string{}
-	c.MetadataRegexPatternList = []MetadataRegexPattern{}
+	c.MetadataSeparatorList = []string{}
 
 	if c.MetadataRows > 0 {
-		if len(c.MetadataRegex) == 0 {
+		if len(c.MetadataSeparators) == 0 {
 			return fmt.Errorf("when csv_metadata_rows is defined, " +
-				"csv_metadata_regex must have at least one valid regex pattern string")
+				"cvs_metadata_separators must have at least one valid separator string")
 		}
-		for i, p := range c.MetadataRegex {
-			re, err := regexp.Compile(p)
-			errorMessage := fmt.Sprintf("the csv_metadata_regex[%d] regex pattern", i)
-			if err != nil {
-				return fmt.Errorf("%s is invalid", errorMessage)
-			}
-			x := MetadataRegexPattern{
-				Re:         re,
-				KeyIndex:   0,
-				ValueIndex: 0,
-			}
-			for j, k := range x.Re.SubexpNames() {
-				if k == "key" {
-					x.KeyIndex = j
-				} else if k == "value" {
-					x.ValueIndex = j
-				}
-			}
-			if x.KeyIndex == 0 || x.ValueIndex == 0 {
-				return fmt.Errorf("%s must contain both a `key` and `value` subgroup label", errorMessage)
-			}
-			c.MetadataRegexPatternList = append(c.MetadataRegexPatternList, x)
-		}
+		c.MetadataSeparatorList = getUniqueMetadataPatterns(c.MetadataSeparators)
+		sort.Sort(c.MetadataSeparatorList)
 	}
 	return nil
 }
 
-func (p *Parser) ParseMetadataRow(str string) *Metadata {
-	for _, re := range p.MetadataRegexPatternList {
-		result := re.Re.FindStringSubmatch(str)
-		if result != nil {
-			// Found a match
-			return &Metadata{
-				result[re.KeyIndex],
-				result[re.ValueIndex],
-			}
+func (p *Parser) ParseMetadataRow(haystack string) *Metadata {
+	metadata := Metadata{}
+	haystack = strings.TrimRight(haystack, "\r\n")
+	for _, needle := range p.MetadataSeparatorList {
+		index := strings.Index(haystack, needle)
+		if index <= 0 {
+			continue
+		}
+		metadata.key = strings.Trim(haystack[:index], p.MetadataTrimSet)
+		metadata.value = strings.Trim(haystack[index+len(needle):], p.MetadataTrimSet)
+		if len(metadata.key) > 0 {
+			return &metadata
 		}
 	}
 	return nil

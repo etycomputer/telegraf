@@ -1372,7 +1372,8 @@ func (c *Config) getParserConfig(name string, tbl *ast.Table) (*parsers.Config, 
 	c.getFieldBool(tbl, "csv_trim_space", &pc.CSVTrimSpace)
 	c.getFieldStringSlice(tbl, "csv_skip_values", &pc.CSVSkipValues)
 	c.getFieldInt(tbl, "csv_metadata_rows", &pc.CSVMetadataRows)
-	c.getFieldStringSlice(tbl, "csv_metadata_regex", &pc.CSVMetadataRegex)
+	c.getFieldStringSlice(tbl, "cvs_metadata_separators", &pc.CSVMetadataSeparators)
+	c.getFieldString(tbl, "cvs_metadata_trim_set", &pc.CSVMetadataTrimSet)
 
 	c.getFieldStringSlice(tbl, "form_urlencoded_tag_keys", &pc.FormUrlencodedTagKeys)
 
@@ -1588,7 +1589,7 @@ func (c *Config) missingTomlField(_ reflect.Type, key string) error {
 		"collectd_parse_multivalue", "collectd_security_level", "collectd_typesdb", "collection_jitter",
 		"csv_column_names", "csv_column_types", "csv_comment", "csv_delimiter", "csv_header_row_count",
 		"csv_measurement_column", "csv_skip_columns", "csv_skip_rows", "csv_tag_columns",
-		"csv_timestamp_column", "csv_timestamp_format", "csv_timezone", "csv_trim_space", "csv_skip_values", "csv_metadata_rows", "csv_metadata_regex",
+		"csv_timestamp_column", "csv_timestamp_format", "csv_timezone", "csv_trim_space", "csv_skip_values", "csv_metadata_rows", "cvs_metadata_separators", "cvs_metadata_trim_set",
 		"data_format", "data_type", "delay", "drop", "drop_original", "dropwizard_metric_registry_path",
 		"dropwizard_tag_paths", "dropwizard_tags_path", "dropwizard_time_format", "dropwizard_time_path",
 		"fielddrop", "fieldpass", "flush_interval", "flush_jitter", "form_urlencoded_tag_keys",

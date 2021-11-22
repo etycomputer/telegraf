@@ -39,22 +39,29 @@ values.
   
   ## Indicates the number of rows to parse as metadata before looking for header information. 
   ## By default, the parser assumes there are no metadata rows to parse. 
-  ## If set, the parser would use the regex provided in the csv_metadata_regex  to look for metadata.
-  # csv_metadata_rows = 0
-  ## A list of regex patterns with two subgroups named key and value. If csv_metadata_rows is set,
-  ## csv_metadata_regex must contain at least one regex patterns. Metadata key and value must be
-  ## on the same row.
+  ## If set, the parser would use the provided separators in the cvs_metadata_separators to look for metadata.
+  csv_metadata_rows = 0
+  
+  ## A list of metadata separators. If csv_metadata_rows is set,
+  ## cvs_metadata_separators must contain at least one separator.
+  ## Please note that separators are case sensitive.
   ## For example:
-  ## Using "(?P<key>\\w+)[=](?P<value>\\w+)" 
-  ## to parse "key1=value1" 
-  ## would return key: "key1" and value: "value1"
-  ## Using "[#]?\\s+(?P<value>\\w+)\\s+(?P<key>\\w+)" 
-  ## to parse "#\\tvalue2  key2" 
-  ## would return key: "key2" and value: "value2"
-  ## Using "^(?P<key>[^:]+)[:]\\s+(?P<value>(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}([\\+-]\\d{2}:\\d{2})?))" 
-  ## to parse "file created: 2021-10-08T12:34:18+10:00" 
-  ## would return key: "file created" and value: "2021-10-08T12:34:18+10:00"
-  # csv_metadata_regex = ["^(?P<key>\\w+)[=](?P<value>\\w+)"]
+  ## cvs_metadata_separators = [",", ":", "="]
+  ## to parse "Key1,Value1" "Key2:Value2" "Key3=Value3"
+  ## the returned (key,value) pares would be as follows:
+  ## (Key1,Value1), (Key2,Value2), (Key3,Value3)
+  cvs_metadata_separators = [","]
+  
+  ## A set of metadata trim characters. 
+  ## If cvs_metadata_trim_cutset is not set, no trimming is performed.
+  ## Please note that the trim cutset is case sensitive.
+  ## For example, given the following:
+  ## cvs_metadata_separators = [",", ":", "="]
+  ## cvs_metadata_trim_set = " #'"
+  ## to parse "# Version = 1.1" "Creation Date: '2021-11-01'"
+  ## the returned (key,value) pares would be as follows:
+  ## (Version,1.1), (Creation Date,2021-11-01)
+  cvs_metadata_trim_set = ""
 
   ## Indicates the number of columns to skip before looking for data to parse.
   ## These columns will be skipped in the header as well.
