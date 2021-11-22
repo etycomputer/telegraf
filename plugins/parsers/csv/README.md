@@ -40,27 +40,18 @@ values.
   ## Indicates the number of rows to parse as metadata before looking for header information. 
   ## By default, the parser assumes there are no metadata rows to parse. 
   ## If set, the parser would use the provided separators in the cvs_metadata_separators to look for metadata.
+  ## Please note that by default, the (key, value) pairs will be added as fields. 
+  ## Use the tag_columns to convert the metadata into tags.
   csv_metadata_rows = 0
   
   ## A list of metadata separators. If csv_metadata_rows is set,
   ## cvs_metadata_separators must contain at least one separator.
   ## Please note that separators are case sensitive.
-  ## For example:
-  ## cvs_metadata_separators = [",", ":", "="]
-  ## to parse "Key1,Value1" "Key2:Value2" "Key3=Value3"
-  ## the returned (key,value) pares would be as follows:
-  ## (Key1,Value1), (Key2,Value2), (Key3,Value3)
-  cvs_metadata_separators = [","]
+  cvs_metadata_separators = [":", "="]
   
   ## A set of metadata trim characters. 
   ## If cvs_metadata_trim_cutset is not set, no trimming is performed.
   ## Please note that the trim cutset is case sensitive.
-  ## For example, given the following:
-  ## cvs_metadata_separators = [",", ":", "="]
-  ## cvs_metadata_trim_set = " #'"
-  ## to parse "# Version = 1.1" "Creation Date: '2021-11-01'"
-  ## the returned (key,value) pares would be as follows:
-  ## (Version,1.1), (Creation Date,2021-11-01)
   cvs_metadata_trim_set = ""
 
   ## Indicates the number of columns to skip before looking for data to parse.
@@ -153,6 +144,36 @@ Output:
 
 ```shell
 cpu cpu=cpu0,time_user=42,time_system=42,time_idle=42 1536869008000000000
+```
+
+Config:
+
+```toml
+[[inputs.file]]
+  files = ["example"]
+  data_format = "csv"
+  csv_metadata_rows = 2
+  cvs_metadata_separators = [":", "="]
+  cvs_metadata_trim_set = " #"
+  csv_header_row_count = 1
+  csv_tag_columns = ["Version","File Created"]
+  csv_timestamp_column = "time"
+  csv_timestamp_format = "2006-01-02T15:04:05Z07:00"
+```
+
+Input:
+
+```shell
+# Version=1.1
+# File Created: 2021-11-17T07:02:45+10:00
+measurement,cpu,time_user,time_system,time_idle,time
+cpu,cpu0,42,42,42,2018-09-13T13:03:28Z
+```
+
+Output:
+
+```shell
+cpu,File\ Created=2021-11-17T07:02:45+10:00,Version=1.1 cpu=cpu0,time_user=42,time_system=42,time_idle=42 1536869008000000000
 ```
 
 [metric filtering]: /docs/CONFIGURATION.md#metric-filtering
