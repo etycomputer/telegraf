@@ -57,6 +57,8 @@ type Config struct {
 	TimeFunc      func() time.Time
 	DefaultTags   map[string]string
 	DefaultFields map[string]string
+
+	Log telegraf.Logger `toml:"-"`
 }
 
 // Parser is a CSV parser, you should use NewParser to create a new instance.
@@ -380,11 +382,19 @@ outer:
 
 	// add default tags
 	for k, v := range p.DefaultTags {
+		_, exists := tags[k]
+		if exists {
+			p.Log.Warnf("Tag %s has been overwritten.", k)
+		}
 		tags[k] = v
 	}
 
 	// add default fields
 	for k, v := range p.DefaultFields {
+		_, exists := recordFields[k]
+		if exists {
+			p.Log.Warnf("Field %s has been overwritten.", k)
+		}
 		recordFields[k] = v
 	}
 

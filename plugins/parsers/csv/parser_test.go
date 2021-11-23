@@ -22,6 +22,7 @@ func TestBasicCSV(t *testing.T) {
 			ColumnNames: []string{"first", "second", "third"},
 			TagColumns:  []string{"third"},
 			TimeFunc:    DefaultTime,
+			Log:         testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -36,6 +37,7 @@ func TestHeaderConcatenationCSV(t *testing.T) {
 			HeaderRowCount:    2,
 			MeasurementColumn: "3",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -55,6 +57,7 @@ func TestHeaderOverride(t *testing.T) {
 			ColumnNames:       []string{"first", "second", "third"},
 			MeasurementColumn: "third",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -77,6 +80,7 @@ func TestHeaderOverride(t *testing.T) {
 			ColumnNames:       []string{"first", "second", "third"},
 			MeasurementColumn: "third",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -98,6 +102,7 @@ func TestTimestamp(t *testing.T) {
 			TimestampColumn:   "first",
 			TimestampFormat:   "02/01/06 03:04:05 PM",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	testCSV := `line1,line2,line3
@@ -119,6 +124,7 @@ func TestTimestampYYYYMMDDHHmm(t *testing.T) {
 			TimestampColumn:   "first",
 			TimestampFormat:   "200601021504",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	testCSV := `line1,line2,line3
@@ -138,6 +144,7 @@ func TestTimestampError(t *testing.T) {
 			MeasurementColumn: "third",
 			TimestampColumn:   "first",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -157,6 +164,7 @@ func TestTimestampUnixFormat(t *testing.T) {
 			TimestampColumn:   "first",
 			TimestampFormat:   "unix",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -178,6 +186,7 @@ func TestTimestampUnixMSFormat(t *testing.T) {
 			TimestampColumn:   "first",
 			TimestampFormat:   "unix_ms",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -197,6 +206,7 @@ func TestQuotedCharacter(t *testing.T) {
 			ColumnNames:       []string{"first", "second", "third"},
 			MeasurementColumn: "third",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -216,6 +226,7 @@ func TestDelimiter(t *testing.T) {
 			ColumnNames:       []string{"first", "second", "third"},
 			MeasurementColumn: "third",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -235,6 +246,7 @@ func TestValueConversion(t *testing.T) {
 			ColumnNames:    []string{"first", "second", "third", "fourth"},
 			MetricName:     "test_value",
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -277,6 +289,7 @@ func TestSkipComment(t *testing.T) {
 			ColumnNames:    []string{"first", "second", "third", "fourth"},
 			MetricName:     "test_value",
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -303,6 +316,7 @@ func TestTrimSpace(t *testing.T) {
 			ColumnNames:    []string{"first", "second", "third", "fourth"},
 			MetricName:     "test_value",
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -324,6 +338,7 @@ func TestTrimSpace(t *testing.T) {
 			HeaderRowCount: 2,
 			TrimSpace:      true,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -343,6 +358,7 @@ func TestTrimSpaceDelimitedBySpace(t *testing.T) {
 			HeaderRowCount: 1,
 			TrimSpace:      true,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -371,6 +387,7 @@ func TestSkipRows(t *testing.T) {
 			TagColumns:        []string{"line1"},
 			MeasurementColumn: "line3",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -397,6 +414,7 @@ hello,80,test_name2`
 			TagColumns:        []string{"line1"},
 			MeasurementColumn: "line3",
 			TimeFunc:          DefaultTime,
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -422,6 +440,7 @@ func TestSkipColumns(t *testing.T) {
 			SkipColumns: 1,
 			ColumnNames: []string{"line1", "line2"},
 			TimeFunc:    DefaultTime,
+			Log:         testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -442,6 +461,7 @@ func TestSkipColumnsWithHeader(t *testing.T) {
 			SkipColumns:    1,
 			HeaderRowCount: 2,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -460,6 +480,7 @@ func TestMultiHeader(t *testing.T) {
 		&Config{
 			HeaderRowCount: 2,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -477,6 +498,7 @@ func TestMultiHeader(t *testing.T) {
 		&Config{
 			HeaderRowCount: 2,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -499,6 +521,7 @@ func TestParseStream(t *testing.T) {
 			MetricName:     "csv",
 			HeaderRowCount: 1,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -530,6 +553,7 @@ func TestParseLineMultiMetricErrorMessage(t *testing.T) {
 			MetricName:     "csv",
 			HeaderRowCount: 1,
 			TimeFunc:       DefaultTime,
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -570,6 +594,7 @@ func TestTimestampUnixFloatPrecision(t *testing.T) {
 			TimestampColumn: "time",
 			TimestampFormat: "unix",
 			TimeFunc:        DefaultTime,
+			Log:             testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -600,6 +625,7 @@ func TestSkipMeasurementColumn(t *testing.T) {
 			TimestampFormat: "unix",
 			TimeFunc:        DefaultTime,
 			TrimSpace:       true,
+			Log:             testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -632,6 +658,7 @@ func TestSkipTimestampColumn(t *testing.T) {
 			TimestampFormat: "unix",
 			TimeFunc:        DefaultTime,
 			TrimSpace:       true,
+			Log:             testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -665,6 +692,7 @@ func TestTimestampTimezone(t *testing.T) {
 			TimestampFormat:   "02/01/06 03:04:05 PM",
 			TimeFunc:          DefaultTime,
 			Timezone:          "Asia/Jakarta",
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -685,6 +713,7 @@ func TestEmptyMeasurementName(t *testing.T) {
 			HeaderRowCount:    1,
 			ColumnNames:       []string{"", "b"},
 			MeasurementColumn: "",
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -712,6 +741,7 @@ func TestNumericMeasurementName(t *testing.T) {
 			HeaderRowCount:    1,
 			ColumnNames:       []string{"a", "b"},
 			MeasurementColumn: "a",
+			Log:               testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -738,6 +768,7 @@ func TestStaticMeasurementName(t *testing.T) {
 			MetricName:     "csv",
 			HeaderRowCount: 1,
 			ColumnNames:    []string{"a", "b"},
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -766,6 +797,7 @@ func TestSkipEmptyStringValue(t *testing.T) {
 			HeaderRowCount: 1,
 			ColumnNames:    []string{"a", "b"},
 			SkipValues:     []string{""},
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -793,6 +825,7 @@ func TestSkipSpecifiedStringValue(t *testing.T) {
 			HeaderRowCount: 1,
 			ColumnNames:    []string{"a", "b"},
 			SkipValues:     []string{"MM"},
+			Log:            testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -819,6 +852,7 @@ func TestParseMetadataSeparators(t *testing.T) {
 			ColumnNames:        []string{"a", "b"},
 			MetadataRows:       0,
 			MetadataSeparators: []string{},
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -828,6 +862,7 @@ func TestParseMetadataSeparators(t *testing.T) {
 			ColumnNames:        []string{"a", "b"},
 			MetadataRows:       1,
 			MetadataSeparators: []string{},
+			Log:                testutil.Logger{},
 		},
 	)
 	require.Error(t, err)
@@ -839,6 +874,7 @@ func TestParseMetadataSeparators(t *testing.T) {
 			ColumnNames:        []string{"a", "b"},
 			MetadataRows:       1,
 			MetadataSeparators: []string{",", ":", "=", ",", ":", "=", ":="},
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -851,6 +887,7 @@ func TestParseMetadataSeparators(t *testing.T) {
 			MetadataRows:       1,
 			MetadataSeparators: []string{",", ":", "=", ":="},
 			MetadataTrimSet:    " #'",
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -865,6 +902,7 @@ func TestParseMetadataRow(t *testing.T) {
 			ColumnNames:        []string{"a", "b"},
 			MetadataRows:       5,
 			MetadataSeparators: []string{":=", ",", ":", "="},
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -885,6 +923,7 @@ func TestParseMetadataRow(t *testing.T) {
 			MetadataRows:       5,
 			MetadataSeparators: []string{":=", ",", ":", "="},
 			MetadataTrimSet:    " #'",
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -911,6 +950,7 @@ func TestParseCSVFileWithMetadata(t *testing.T) {
 			TagColumns:         []string{"type", "version"},
 			MetadataSeparators: []string{":", "="},
 			MetadataTrimSet:    " #",
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -967,6 +1007,7 @@ timestamp,type,name,status
 			TagColumns:         []string{"type", "version"},
 			MetadataSeparators: []string{":", "="},
 			MetadataTrimSet:    " #",
+			Log:                testutil.Logger{},
 		},
 	)
 	require.NoError(t, err)
@@ -1004,4 +1045,31 @@ timestamp,type,name,status
 	require.NoError(t, err)
 	require.Equal(t, expectedFields[1], m.Fields())
 	require.Equal(t, expectedTags[1], m.Tags())
+}
+
+func TestOverwriteFieldsAndTags(t *testing.T) {
+	logger := testutil.Logger{}
+	p, err := NewParser(
+		&Config{
+			ColumnNames:        []string{"first", "second", "third"},
+			TagColumns:         []string{"third"},
+			TimeFunc:           DefaultTime,
+			MetadataRows:       1,
+			MetadataSeparators: []string{"="},
+			Log:                logger,
+		},
+	)
+	require.NoError(t, err)
+	p.SetDefaultTags(map[string]string{"third": "bye"})
+	m, err := p.ParseLine("second=orange")
+	require.NoError(t, err)
+	require.Nil(t, m)
+	expectedFields := []map[string]interface{}{{"first": 1.4, "second": "orange"}}
+	expectedTags := []map[string]string{{"third": "bye"}}
+
+	m, err = p.ParseLine("1.4,apple,hi")
+	require.NoError(t, err)
+
+	require.Equal(t, expectedFields[0], m.Fields())
+	require.Equal(t, expectedTags[0], m.Tags())
 }
