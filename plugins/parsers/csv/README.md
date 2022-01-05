@@ -39,20 +39,20 @@ values.
   
   ## Indicates the number of rows to parse as metadata before looking for header information. 
   ## By default, the parser assumes there are no metadata rows to parse. 
-  ## If set, the parser would use the provided separators in the cvs_metadata_separators to look for metadata.
+  ## If set, the parser would use the provided separators in the csv_metadata_separators to look for metadata.
   ## Please note that by default, the (key, value) pairs will be added as fields. 
   ## Use the tag_columns to convert the metadata into tags.
   csv_metadata_rows = 0
   
   ## A list of metadata separators. If csv_metadata_rows is set,
-  ## cvs_metadata_separators must contain at least one separator.
+  ## csv_metadata_separators must contain at least one separator.
   ## Please note that separators are case sensitive and the sequence of the seperators are respected.
-  cvs_metadata_separators = [":", "="]
+  csv_metadata_separators = [":", "="]
   
   ## A set of metadata trim characters. 
-  ## If cvs_metadata_trim_cutset is not set, no trimming is performed.
+  ## If csv_metadata_trim_cutset is not set, no trimming is performed.
   ## Please note that the trim cutset is case sensitive.
-  cvs_metadata_trim_set = ""
+  csv_metadata_trim_set = ""
 
   ## Indicates the number of columns to skip before looking for data to parse.
   ## These columns will be skipped in the header as well.
@@ -157,8 +157,8 @@ Config:
   files = ["example"]
   data_format = "csv"
   csv_metadata_rows = 2
-  cvs_metadata_separators = [":", "="]
-  cvs_metadata_trim_set = " #"
+  csv_metadata_separators = [":", "="]
+  csv_metadata_trim_set = " #"
   csv_header_row_count = 1
   csv_tag_columns = ["Version","File Created"]
   csv_timestamp_column = "time"

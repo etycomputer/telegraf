@@ -869,8 +869,8 @@ func TestParseMetadataSeparators(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-	require.Equal(t, err.Error(), "when csv_metadata_rows is defined, "+
-		"cvs_metadata_separators must have at least one valid separator string")
+	require.Equal(t, err.Error(), "initializing separators failed: "+
+		"csv_metadata_separator required when specifying csv_metadata_rows")
 	require.Nil(t, p)
 	p, err = NewParser(
 		&Config{
@@ -880,9 +880,9 @@ func TestParseMetadataSeparators(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Len(t, p.MetadataSeparatorList, 4)
+	require.Len(t, p.metadataSeparatorList, 4)
 	require.Len(t, p.MetadataTrimSet, 0)
-	require.Equal(t, p.MetadataSeparatorList, MetadataPattern{":=", ",", "=", ":"})
+	require.Equal(t, p.metadataSeparatorList, metadataPattern{":=", ",", "=", ":"})
 	p, err = NewParser(
 		&Config{
 			ColumnNames:        []string{"a", "b"},
@@ -892,9 +892,9 @@ func TestParseMetadataSeparators(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Len(t, p.MetadataSeparatorList, 4)
+	require.Len(t, p.metadataSeparatorList, 4)
 	require.Len(t, p.MetadataTrimSet, 3)
-	require.Equal(t, p.MetadataSeparatorList, MetadataPattern{":=", ",", ":", "="})
+	require.Equal(t, p.metadataSeparatorList, metadataPattern{":=", ",", ":", "="})
 }
 
 func TestParseMetadataRow(t *testing.T) {
@@ -906,16 +906,16 @@ func TestParseMetadataRow(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Empty(t, p.MetadataTags)
-	m := p.ParseMetadataRow("# this is a not matching string")
+	require.Empty(t, p.metadataTags)
+	m := p.parseMetadataRow("# this is a not matching string")
 	require.Nil(t, m)
-	m = p.ParseMetadataRow("# key1 : value1 \r\n")
+	m = p.parseMetadataRow("# key1 : value1 \r\n")
 	require.Equal(t, m, map[string]string{"# key1 ": " value1 "})
-	m = p.ParseMetadataRow("key2=1234\n")
+	m = p.parseMetadataRow("key2=1234\n")
 	require.Equal(t, m, map[string]string{"key2": "1234"})
-	m = p.ParseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
+	m = p.parseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
 	require.Equal(t, m, map[string]string{" file created ": " 2021-10-08T12:34:18+10:00 "})
-	m = p.ParseMetadataRow("file created: 2021-10-08T12:34:18\t\r\r\n")
+	m = p.parseMetadataRow("file created: 2021-10-08T12:34:18\t\r\r\n")
 	require.Equal(t, m, map[string]string{"file created": " 2021-10-08T12:34:18\t"})
 	p, err = NewParser(
 		&Config{
@@ -926,16 +926,16 @@ func TestParseMetadataRow(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Empty(t, p.MetadataTags)
-	m = p.ParseMetadataRow("# this is a not matching string")
+	require.Empty(t, p.metadataTags)
+	m = p.parseMetadataRow("# this is a not matching string")
 	require.Nil(t, m)
-	m = p.ParseMetadataRow("# key1 : value1 \r\n")
+	m = p.parseMetadataRow("# key1 : value1 \r\n")
 	require.Equal(t, m, map[string]string{"key1": "value1"})
-	m = p.ParseMetadataRow("key2=1234\n")
+	m = p.parseMetadataRow("key2=1234\n")
 	require.Equal(t, m, map[string]string{"key2": "1234"})
-	m = p.ParseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
+	m = p.parseMetadataRow(" file created : 2021-10-08T12:34:18+10:00 \r\n")
 	require.Equal(t, m, map[string]string{"file created": "2021-10-08T12:34:18+10:00"})
-	m = p.ParseMetadataRow("file created: '2021-10-08T12:34:18'\r\n")
+	m = p.parseMetadataRow("file created: '2021-10-08T12:34:18'\r\n")
 	require.Equal(t, m, map[string]string{"file created": "2021-10-08T12:34:18"})
 }
 

@@ -19,33 +19,33 @@ import (
 type TimeFunc func() time.Time
 
 type Config struct {
-	ColumnNames       []string `toml:"csv_column_names"`
-	ColumnTypes       []string `toml:"csv_column_types"`
-	Comment           string   `toml:"csv_comment"`
-	Delimiter         string   `toml:"csv_delimiter"`
-	HeaderRowCount    int      `toml:"csv_header_row_count"`
-	MeasurementColumn string   `toml:"csv_measurement_column"`
-	MetricName        string   `toml:"metric_name"`
-	SkipColumns       int      `toml:"csv_skip_columns"`
-	SkipRows          int      `toml:"csv_skip_rows"`
-	TagColumns        []string `toml:"csv_tag_columns"`
-	TimestampColumn   string   `toml:"csv_timestamp_column"`
-	TimestampFormat   string   `toml:"csv_timestamp_format"`
-	Timezone          string   `toml:"csv_timezone"`
-	TrimSpace         bool     `toml:"csv_trim_space"`
-	SkipValues        []string `toml:"csv_skip_values"`
-	SkipErrors        bool     `toml:"csv_skip_errors"`
+	ColumnNames        []string `toml:"csv_column_names"`
+	ColumnTypes        []string `toml:"csv_column_types"`
+	Comment            string   `toml:"csv_comment"`
+	Delimiter          string   `toml:"csv_delimiter"`
+	HeaderRowCount     int      `toml:"csv_header_row_count"`
+	MeasurementColumn  string   `toml:"csv_measurement_column"`
+	MetricName         string   `toml:"metric_name"`
+	SkipColumns        int      `toml:"csv_skip_columns"`
+	SkipRows           int      `toml:"csv_skip_rows"`
+	TagColumns         []string `toml:"csv_tag_columns"`
+	TimestampColumn    string   `toml:"csv_timestamp_column"`
+	TimestampFormat    string   `toml:"csv_timestamp_format"`
+	Timezone           string   `toml:"csv_timezone"`
+	TrimSpace          bool     `toml:"csv_trim_space"`
+	SkipValues         []string `toml:"csv_skip_values"`
+	SkipErrors         bool     `toml:"csv_skip_errors"`
 	MetadataRows       int      `toml:"csv_metadata_rows"`
-	MetadataSeparators []string `toml:"cvs_metadata_separators"`
-	MetadataTrimSet    string   `toml:"cvs_metadata_trim_set"`
+	MetadataSeparators []string `toml:"csv_metadata_separators"`
+	MetadataTrimSet    string   `toml:"csv_metadata_trim_set"`
 
-	MetadataSeparatorList MetadataPattern
+	metadataSeparatorList metadataPattern
 
 	gotColumnNames bool
 
 	TimeFunc     func() time.Time
 	DefaultTags  map[string]string
-	MetadataTags map[string]string
+	metadataTags map[string]string
 }
 
 // Parser is a CSV parser, you should use NewParser to create a new instance.
@@ -54,52 +54,50 @@ type Parser struct {
 	Log telegraf.Logger
 }
 
-type MetadataPattern []string
+type metadataPattern []string
 
-func (record MetadataPattern) Len() int {
+func (record metadataPattern) Len() int {
 	return len(record)
 }
-func (record MetadataPattern) Swap(i, j int) {
+func (record metadataPattern) Swap(i, j int) {
 	record[i], record[j] = record[j], record[i]
 }
-func (record MetadataPattern) Less(i, j int) bool {
+func (record metadataPattern) Less(i, j int) bool {
 	// Metadata with longer lengths should be ordered before shorter metadata
 	return len(record[i]) > len(record[j])
 }
 
-func getUniqueMetadataPatterns(patternMap []string) MetadataPattern {
-	result := MetadataPattern{}
+func (c *Config) initializeMetadataSeparators() error {
+	// initialize metadata
+	c.metadataTags = map[string]string{}
+	c.metadataSeparatorList = []string{}
+
+	if c.MetadataRows <= 0 {
+		return nil
+	}
+
+	if len(c.MetadataSeparators) == 0 {
+		return fmt.Errorf("csv_metadata_separator required when specifying csv_metadata_rows")
+	}
+
+	c.metadataSeparatorList = metadataPattern{}
 	patternList := map[string]bool{}
-	for _, p := range patternMap {
+	for _, p := range c.MetadataSeparators {
 		if patternList[p] {
 			// Ignore further, duplicated entries
 			continue
 		}
 		patternList[p] = true
-		result = append(result, p)
+		c.metadataSeparatorList = append(c.metadataSeparatorList, p)
 	}
-	return result
-}
+	sort.Stable(c.metadataSeparatorList)
 
-func (c *Config) initializeMetadataSeparators() error {
-	// initialize metadata
-	c.MetadataTags = map[string]string{}
-	c.MetadataSeparatorList = []string{}
-
-	if c.MetadataRows > 0 {
-		if len(c.MetadataSeparators) == 0 {
-			return fmt.Errorf("when csv_metadata_rows is defined, " +
-				"cvs_metadata_separators must have at least one valid separator string")
-		}
-		c.MetadataSeparatorList = getUniqueMetadataPatterns(c.MetadataSeparators)
-		sort.Stable(c.MetadataSeparatorList)
-	}
 	return nil
 }
 
-func (p *Parser) ParseMetadataRow(haystack string) map[string]string {
+func (p *Parser) parseMetadataRow(haystack string) map[string]string {
 	haystack = strings.TrimRight(haystack, "\r\n")
-	for _, needle := range p.MetadataSeparatorList {
+	for _, needle := range p.metadataSeparatorList {
 		metadata := strings.SplitN(haystack, needle, 2)
 		if len(metadata) < 2 {
 			continue
@@ -136,9 +134,8 @@ func NewParser(c *Config) (*Parser, error) {
 		return nil, fmt.Errorf("csv_column_names field count doesn't match with csv_column_types")
 	}
 
-	err := c.initializeMetadataSeparators()
-	if err != nil {
-		return nil, err
+	if err := c.initializeMetadataSeparators(); err != nil {
+		return nil, fmt.Errorf("initializing separators failed: %v", err)
 	}
 
 	c.gotColumnNames = len(c.ColumnNames) > 0
@@ -173,8 +170,6 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 	return parseCSV(p, r)
 }
 
-// ParseLine does not use any information in header and assumes DataColumns is set
-// it will also not skip any rows
 func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
 	if len(line) == 0 {
 		if p.SkipRows > 0 {
@@ -217,9 +212,9 @@ func parseCSV(p *Parser, r io.Reader) ([]telegraf.Metric, error) {
 			return nil, err
 		}
 		p.MetadataRows--
-		m := p.ParseMetadataRow(line)
+		m := p.parseMetadataRow(line)
 		for k, v := range m {
-			p.MetadataTags[k] = v
+			p.metadataTags[k] = v
 		}
 	}
 	csvReader := p.compile(lineReader)
@@ -359,7 +354,7 @@ outer:
 	}
 
 	// add metadata fields
-	for k, v := range p.MetadataTags {
+	for k, v := range p.metadataTags {
 		tags[k] = v
 	}
 
