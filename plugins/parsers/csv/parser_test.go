@@ -943,7 +943,7 @@ func TestParseCSVFileWithMetadata(t *testing.T) {
 	p, err := NewParser(
 		&Config{
 			HeaderRowCount:     1,
-			SkipRows:           1,
+			SkipRows:           2,
 			MetadataRows:       4,
 			Comment:            "#",
 			TagColumns:         []string{"type"},
@@ -955,6 +955,7 @@ func TestParseCSVFileWithMetadata(t *testing.T) {
 	testCSV := `garbage nonsense that needs be skipped
 
 # version= 1.0
+
     invalid meta data that can be ignored.
 file created: 2021-10-08T12:34:18+10:00
 timestamp,type,name,status
